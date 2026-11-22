@@ -7,8 +7,8 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Datos (se descargan o se colocan localmente; ver data/README.md)
-data/raw/*
-data/processed/*
+#data/raw/*
+#data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
