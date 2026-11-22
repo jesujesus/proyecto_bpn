@@ -1,0 +1,5 @@
+﻿hipotesis;se_rechaza_H0;recall_S;recall_S_lim_inf_unilateral95;dif_recall_lim_inf;criterio;auc_S;auc_S_lim_inf_unilateral95;delong_p_unilateral;dif_auc_pr_lim_inf;dif_f1_lim_inf;wilcoxon_holm_auc_pr_p;wilcoxon_holm_f1_p
+HE1;False;0,7843137254901961;0,6862745098039216;0,6078431372549019;lím. inf. de ΔRecall > 0 y lím. inf. de Recall(S) > 0,70;;;;;;;
+HE2;False;;;;DeLong p < 0,05 y lím. inf. de AUC(S) > 0,75;0,5884692779259675;0,5147134868267115;0,9803220475918963;;;;
+HE3;False;;;;lím. inf. de ΔAUC-PR y ΔF1 > 0 (prueba) y Wilcoxon-Holm p < 0,05 a favor (CV);;;;-0,05714636184412544;-0,12323610208856114;1,0;0,027711992327049018
+HG;False;;;;se rechaza H0 en HE1, HE2 y HE3;;;;;;;

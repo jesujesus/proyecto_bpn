@@ -1,0 +1,19 @@
+﻿variable;nombre;shap_medio_abs
+Nivel_Intrucción_Madre;Instrucción;0,02648790329106722
+Edad_Madre;Edad de la madre;0,026435288584732076
+MULTIPLE;Embarazo único/múltiple;0,02607484137529402
+DISTRITO;Distrito;0,024888259182708504
+Num_embar_madre;N.º de embarazos;0,0162565663297905
+PRIMIG;Primer embarazo;0,014199020832452875
+Hijos_vivo_madre;Hijos vivos;0,011401482681691381
+SEGURO;Seguro;0,009224081719451436
+INT;Embarazos sin resultado;0,008640419077591086
+AVANZ;Edad avanzada (≥35);0,007964630886319421
+Estado_Civil;Estado civil;0,005928206305682674
+nacmuer_abort_madre;Abortos / nacidos muertos;0,0053231531691901625
+PERDIDAS;Antecedente de abortos;0,004344567267032734
+GRAN;Gran multípara (≥4);0,004195318276081505
+ES_ADOL;Adolescente (<20);0,003443448844791992
+MENOR18;Menor de 18;0,0033841828099607295
+OCUPACION;Ocupación;0,0022230809227462797
+ESTCIV_IGN;Estado civil ignorado;0,0007841693624969387

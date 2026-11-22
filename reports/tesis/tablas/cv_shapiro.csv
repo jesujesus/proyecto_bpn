@@ -1,0 +1,9 @@
+﻿conjunto;metrica;comparacion;W;p;normal_alfa_0.05
+principal_sin_Ipress;AUC-ROC;C2_pesos - C0;0,9840104183972729;0,7283719850904298;True
+principal_sin_Ipress;AUC-PR;C2_pesos - C0;0,9730897856567732;0,3077338565260365;True
+principal_sin_Ipress;F1;C2_pesos - C0;0,9553178068461988;0,05663379701730738;True
+principal_sin_Ipress;Recall;C2_pesos - C0;0,9551344751696118;0,05564655634135106;True
+sensibilidad_con_Ipress;AUC-ROC;C2_pesos - C0;0,9721256823195761;0,2818507437359806;True
+sensibilidad_con_Ipress;AUC-PR;C2_pesos - C0;0,9796610477447594;0,5377569997321661;True
+sensibilidad_con_Ipress;F1;C2_pesos - C0;0,9567451876406344;0,06495761559738274;True
+sensibilidad_con_Ipress;Recall;C2_pesos - C0;0,9736439701487087;0,3235098147603814;True

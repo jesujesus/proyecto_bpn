@@ -1,0 +1,19 @@
+﻿variable,descripcion,tipo,uso,n_faltantes,n_distintos,ejemplo
+Edad_Madre,Edad de la madre en años,int64,Entrada del modelo,0,37,36
+Num_embar_madre,Número de embarazos incluido el actual (>=5 se codifica como 5),float64,Entrada del modelo,43,5,5.0
+Hijos_vivo_madre,Hijos vivos incluido el recién nacido (>=5 se codifica como 5),float64,Entrada del modelo,35,5,4.0
+nacmuer_abort_madre,Nacidos muertos / abortos previos,float64,Entrada del modelo,469,7,1.0
+Estado_Civil,Estado civil de la madre,str,Entrada del modelo,0,6,SOLTERO
+Nivel_Intrucción_Madre,Nivel de instrucción de la madre,str,Entrada del modelo,0,11,SECUNDARIA INCOMPLETA
+DESC_OCUPACION,Ocupación de la madre,str,Entrada del modelo,0,96,AMA DE CASA
+Tipo_Parto,Embarazo único o múltiple,str,Entrada del modelo (único/múltiple),0,4,UNICO
+IdUbigeoInei,Ubigeo INEI del distrito (texto de 6 dígitos),str,Entrada del modelo (distrito),0,12,010606
+Financiador_Parto,"Seguro / financiador (SIS, EsSalud...)",str,Entrada del modelo (seguro),0,8,SIS
+FecNac_Año,Año de nacimiento,int64,Referencia (NO es entrada),0,12,2015
+FecNac_Mes,Mes de nacimiento,int64,Referencia (NO es entrada),0,12,2
+Ipress,Código del establecimiento de salud,str,NO es entrada (solo análisis de sensibilidad),0,233,4838
+Pais_Madre,País de origen de la madre,str,"NO es entrada (99,6 % Perú)",0,4,PERU
+Hijos_fallec_madre,Hijos fallecidos (NaN original = 0),int64,"NO es entrada (96,4 % sin dato = 0)",0,6,0
+DUR_EMB_PARTO,Semanas de gestación al parto,int64,Solo subgrupos OMS (NO es entrada),0,19,40
+PESO_NACIDO,Peso al nacer en gramos,int64,Solo para construir el objetivo,0,572,3030
+RIESGO_BAJO_PESO,"1 si PESO_NACIDO < 2500 g, 0 si no",int64,Variable objetivo (1 = peso < 2500 g),0,2,0

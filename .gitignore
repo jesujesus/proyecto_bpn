@@ -1,0 +1,31 @@
+# Entornos virtuales y caché de Python
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Datos (se descargan o se colocan localmente; ver data/README.md)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Base de datos local de la app (historial y respuestas del SUS: pueden ser datos personales)
+data/app.db
+*.db
+*.sqlite
+
+# Secretos, registros y archivos del sistema
+.env
+.streamlit/secrets.toml
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Archivos comprimidos y resultados temporales
+*.zip
+reports/_humo/
