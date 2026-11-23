@@ -7,7 +7,9 @@ DATA_PROC = RAIZ / "data" / "processed"
 MODELOS = RAIZ / "models"
 REPORTES = RAIZ / "reports"
 REPORTES_TESIS = REPORTES / "tesis"
-DB_PATH = RAIZ / "data" / "app.db"
+REGISTROS = RAIZ / "data" / "registros"          # "base de datos" en CSV: lo que guarda la app
+PRED_CSV = REGISTROS / "predicciones.csv"        # una fila por evaluación de gestante
+SUS_CSV = REGISTROS / "sus_respuestas.csv"       # una fila por cuestionario SUS
 
 EXCEL_ORIGEN = "Rodriguez_de_Mendoza_LIMPIO.xlsx"
 HOJA = "Datos_Completos"

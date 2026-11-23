@@ -12,8 +12,9 @@ __pycache__/
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
-# Base de datos local de la app (historial y respuestas del SUS: pueden ser datos personales)
-data/app.db
+# Registros que guarda la app (predicciones y respuestas del SUS): no se versionan
+data/registros/*
+!data/registros/.gitkeep
 *.db
 *.sqlite
 

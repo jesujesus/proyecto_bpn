@@ -1,10 +1,11 @@
 """Aplicación Streamlit: inicio, formulario, resultado, historial/reporte, métricas del modelo y cuestionario SUS."""
-import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from datetime import date
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -12,7 +13,7 @@ import requests
 import streamlit as st
 
 import config as C
-import db
+import registros as reg
 from ml.predictor import Predictor, validar_datos
 
 API_URL = "http://127.0.0.1:8000"
@@ -143,11 +144,11 @@ def pantalla_formulario():
             return
         try:
             res = calcular(datos, usar_api)
-            db.guardar_evaluacion(datos, res)
         except Exception:
             st.error("No se pudo calcular el resultado en este momento. Inténtelo de nuevo; si el problema continúa, avise al responsable del sistema.")
             return
-        st.session_state["resultado"] = {"res": res, "datos": datos}
+        st.session_state["resultado"] = {"res": res, "datos": datos,
+                                         "guardado": reg.guardar_prediccion(datos, res, opc["distritos"])}
         ir("resultado")
         st.rerun()
 
@@ -184,6 +185,8 @@ def pantalla_resultado():
     else:
         st.info("No fue posible generar la explicación para este caso.")
 
+    if not r.get("guardado", True):
+        st.warning("El resultado no se pudo guardar en el historial (¿el archivo predicciones.csv está abierto en Excel?). Ciérrelo y vuelva a calcular.")
     st.markdown('<div class="nota">Resultado orientativo. Siga el protocolo de atención prenatal del establecimiento.</div>', unsafe_allow_html=True)
     st.write("")
     b1, b2 = st.columns(2)
@@ -194,28 +197,28 @@ def pantalla_resultado():
 # ----------------------------------------------------------------------------- historial y reporte
 def seccion_historial():
     st.subheader("Historial y reporte")
-    h = db.leer_historial()
+    h = reg.leer_predicciones()
     if h.empty:
         st.info("Aún no hay evaluaciones guardadas.")
         return
-    ent = pd.json_normalize(h["entrada"].apply(json.loads))
+    h = h.iloc[::-1].reset_index(drop=True)
     tabla = pd.DataFrame({
-        "Fecha": h["fecha"], "Edad": ent["edad"], "Distrito": ent["distrito"].map(opc["distritos"]),
-        "Seguro": ent["seguro"].map(SEGURO), "Embarazos": ent["embarazos"],
-        "Riesgo": h["nivel"].map({"ALTO": "Alto", "MEDIO": "Medio", "BAJO": "Bajo"}), "Puntaje (%)": h["puntaje"].round(0),
-        "Factor que más aumenta": h["aumentan"].apply(lambda s: (json.loads(s) or ["—"])[0])})
+        "Fecha y hora": h["registrado_el"], "Edad": h["edad"], "Distrito": h["distrito"], "Seguro": h["seguro"].map(SEGURO).fillna(h["seguro"]),
+        "Embarazos": h["embarazos"], "Riesgo": h["nivel_riesgo"].map({"ALTO": "Alto", "MEDIO": "Medio", "BAJO": "Bajo"}),
+        "Puntaje (%)": h["puntaje_riesgo"].round(0),
+        "Factor que más aumenta": h["factores_aumentan"].fillna("").apply(lambda t: t.split(" | ")[0] if t else "—")})
     k = st.columns(4)
     k[0].metric("Evaluaciones", len(h))
     for col, n in zip(k[1:], ["Alto", "Medio", "Bajo"]):
         col.metric(f"Riesgo {n.lower()}", int((tabla["Riesgo"] == n).sum()))
-    st.caption(f"Cobertura de explicaciones: {h['shap_ok'].mean()*100:.0f} % · Puntaje promedio: {h['puntaje'].mean():.0f} %")
+    st.caption(f"Puntaje promedio: {h['puntaje_riesgo'].mean():.0f} % · Archivo: data/registros/predicciones.csv")
     st.dataframe(tabla, hide_index=True, width="stretch")
     resumen = (f"# Reporte de evaluaciones\n\n- Total de evaluaciones: {len(h)}\n"
                + "".join(f"- Riesgo {n.lower()}: {int((tabla['Riesgo'] == n).sum())}\n" for n in ["Alto", "Medio", "Bajo"])
-               + f"- Edad promedio: {tabla['Edad'].mean():.1f} años\n- Puntaje promedio: {h['puntaje'].mean():.0f} %\n"
-               f"- Período: {h['fecha'].min()} a {h['fecha'].max()}\n\nResultados orientativos; no reemplazan el criterio clínico.\n")
+               + f"- Edad promedio: {tabla['Edad'].mean():.1f} años\n- Puntaje promedio: {h['puntaje_riesgo'].mean():.0f} %\n"
+               f"- Período: {h['registrado_el'].min()} a {h['registrado_el'].max()}\n\nResultados orientativos; no reemplazan el criterio clínico.\n")
     c1, c2 = st.columns(2)
-    c1.download_button("⬇️ Descargar historial (CSV)", tabla.to_csv(index=False).encode("utf-8-sig"), "historial_evaluaciones.csv", "text/csv")
+    c1.download_button("⬇️ Descargar predicciones (CSV completo)", h.iloc[::-1].to_csv(index=False).encode("utf-8-sig"), "predicciones.csv", "text/csv")
     c2.download_button("⬇️ Descargar resumen (texto)", resumen.encode("utf-8"), "resumen_evaluaciones.md", "text/markdown")
 
 
@@ -259,26 +262,67 @@ def seccion_metricas():
 
 # ----------------------------------------------------------------------------- SUS
 def seccion_sus():
-    st.subheader("Cuestionario de usabilidad SUS")
-    st.caption("1 = Totalmente en desacuerdo · 5 = Totalmente de acuerdo")
-    with st.form("form_sus"):
-        n1, n2 = st.columns(2)
-        nombre = n1.text_input("Nombre o código del participante")
-        rol = n2.selectbox("Rol", ["Obstetra", "Enfermera/o", "Médico/a", "Técnico/a", "Estudiante", "Otro"])
-        resp = [st.radio(f"{i}. {t}", [1, 2, 3, 4, 5], index=2, horizontal=True, key=f"sus{i}") for i, t in enumerate(db.SUS_ITEMS, 1)]
-        comentario = st.text_area("Comentarios (opcional)")
-        ok = st.form_submit_button("Guardar respuestas", type="primary")
-    if ok:
-        if not nombre.strip():
-            st.error("Escriba un nombre o código.")
+    st.markdown("<div style='text-align:center'><b>UNIVERSIDAD AUTÓNOMA DEL PERÚ</b><br>Escuela Profesional de Ingeniería de Sistemas</div>",
+                unsafe_allow_html=True)
+    st.subheader("Cuestionario de usabilidad del sistema (System Usability Scale, SUS)")
+    st.caption("Investigación: Sistema predictivo basado en Machine Learning para la detección del bajo peso al nacer en un centro de "
+               "atención primaria de la provincia de Rodríguez de Mendoza, Amazonas, 2026.")
+    if msg := st.session_state.pop("sus_ok", None):
+        st.success(msg)
+    ver = st.session_state.setdefault("sus_form", 0)       # cambia al guardar, para limpiar el formulario
+    with st.form(f"form_sus_{ver}"):
+        c1, c2, c3 = st.columns(3)
+        c1.text_input("Cuestionario N.º", value=str(reg.siguiente_sus()), disabled=True)
+        fecha = c2.date_input("Fecha", value=date.today(), format="DD/MM/YYYY")
+        casos = c3.selectbox("Casos registrados (de 5)", [0, 1, 2, 3, 4, 5], index=None, placeholder="Elija")
+        st.markdown("**Datos del participante**")
+        profesion = st.radio("Profesión", reg.PROFESIONES, horizontal=True, index=None)
+        otra = st.text_input("Si marcó «Otra», especifique")
+        experiencia = st.radio("Años de experiencia en atención prenatal", reg.EXPERIENCIA, horizontal=True, index=None)
+        usa_pc = st.radio("¿Usa computadora en su trabajo diario?", ["Sí", "No"], horizontal=True, index=None)
+        st.markdown("**Estimado(a) profesional de salud:** este cuestionario busca conocer su opinión sobre la facilidad de uso del "
+                    "sistema predictivo de bajo peso al nacer que acaba de utilizar. Es anónimo: no escriba su nombre. "
+                    "No hay respuestas correctas ni incorrectas.")
+        st.markdown("**Instrucciones:** marque una sola opción por afirmación, según su grado de acuerdo. Responda todas las afirmaciones. "
+                    "Si no está seguro(a), marque la opción 3.")
+        st.caption(" · ".join(f"{i} = {t}" for i, t in enumerate(reg.ESCALA, 1)))
+        resp = [st.radio(f"{i}. {t}", [1, 2, 3, 4, 5], index=None, horizontal=True, key=f"sus{ver}_{i}")
+                for i, t in enumerate(reg.SUS_ITEMS, 1)]
+        comentarios = st.text_area("Comentarios o sugerencias (opcional)")
+        enviar = st.form_submit_button("Guardar cuestionario", type="primary")
+    if enviar:
+        faltan = [n for n, v in [("Casos registrados", casos), ("Profesión", profesion), ("Años de experiencia", experiencia),
+                                 ("Uso de computadora", usa_pc)] if v is None]
+        sin_resp = [str(i) for i, v in enumerate(resp, 1) if v is None]
+        if sin_resp:
+            faltan.append("afirmaciones " + ", ".join(sin_resp))
+        if profesion == "Otra" and not otra.strip():
+            faltan.append("especificar la profesión «Otra»")
+        if faltan:
+            st.error("Falta completar: " + "; ".join(faltan) + ".")
         else:
-            p = db.guardar_sus(nombre.strip(), rol, resp, comentario)
-            st.success(f"Puntaje SUS: **{p:.1f} / 100** · {db.interpretar_sus(p)}")
-    r = db.leer_sus()
+            r = reg.guardar_sus(fecha, casos, profesion, otra, experiencia, usa_pc, resp, comentarios)
+            if r is None:
+                st.error("No se pudo guardar el cuestionario (¿el archivo sus_respuestas.csv está abierto en Excel?). Ciérrelo e inténtelo de nuevo.")
+            else:
+                st.session_state["sus_ok"] = f"¡Gracias! Su cuestionario quedó registrado (N.º {r[0]})."
+                st.session_state["sus_form"] = ver + 1
+                st.rerun()
+
+    r = reg.leer_sus()
     if not r.empty:
-        st.metric("Puntaje SUS promedio", f"{r['puntaje'].mean():.1f}", help=f"{len(r)} respuestas; ≥ 68 se considera aceptable")
-        st.dataframe(r, hide_index=True, width="stretch")
-        st.download_button("⬇️ Descargar SUS (CSV)", r.to_csv(index=False).encode("utf-8-sig"), "sus_resultados.csv", "text/csv")
+        st.divider()
+        st.markdown("##### Resultados registrados")
+        alfa = reg.alfa_cronbach(r)
+        k = st.columns(4)
+        k[0].metric("Cuestionarios", len(r))
+        k[1].metric("SUS promedio", f"{r['puntaje_sus'].mean():.1f}", help="Una media mayor a 68 se considera aceptable")
+        k[2].metric("Con SUS ≥ 68", int((r["puntaje_sus"] >= 68).sum()))
+        k[3].metric("Alfa de Cronbach", "—" if alfa is None else f"{alfa:.2f}".replace(".", ","), help="Se calcula desde 3 cuestionarios")
+        st.caption("Archivo: data/registros/sus_respuestas.csv")
+        st.dataframe(r[["cuestionario_n", "fecha", "profesion", "experiencia", "usa_computadora", "casos_registrados", "puntaje_sus", "interpretacion"]]
+                     .iloc[::-1], hide_index=True, width="stretch")
+        st.download_button("⬇️ Descargar SUS (CSV completo)", r.to_csv(index=False).encode("utf-8-sig"), "sus_respuestas.csv", "text/csv")
 
 
 # ----------------------------------------------------------------------------- enrutador

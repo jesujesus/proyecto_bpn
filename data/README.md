@@ -18,3 +18,7 @@ por lo que la app y la API funcionan sin los datos.
 
 > Aunque los datos de origen son públicos y anonimizados, los registros individuales de una provincia pequeña
 > pueden ser reidentificables; por eso no se publican en este repositorio.
+
+## Registros de la app
+
+`data/registros/` guarda `predicciones.csv` y `sus_respuestas.csv` (creados por la app). No se versionan.

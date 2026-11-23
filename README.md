@@ -17,10 +17,11 @@ proyecto_bpn/
 │   ├── entrenar.py        CV 10x5, umbrales y modelo final -> models/modelo_bpn.joblib
 │   ├── analisis_tesis.py  análisis completo de la tesis (C0-C3, hipótesis, subgrupos, SHAP) -> reports/tesis/
 │   ├── metricas.py        utilidades de umbral
-│   └── predictor.py       puntaje, nivel de riesgo y explicación SHAP en frases (API y app)
+│   ├── predictor.py       puntaje, nivel de riesgo y explicación SHAP en frases (API y app)
+│   └── sus_analisis.py    análisis del SUS (media, Shapiro-Wilk, t frente a 68, alfa de Cronbach)
 ├── api/main.py            FastAPI: /health, /opciones, /predict
-├── app/app.py, db.py      Streamlit + SQLite
-├── data/  models/  reports/
+├── app/app.py, registros.py   Streamlit; registros.py guarda en CSV (predicciones y SUS)
+├── data/ (raw, processed, registros)  models/  reports/
 ├── requirements.txt
 └── ejecutar_todo.ps1      ejecuta todo en orden
 ```
@@ -67,7 +68,21 @@ Los nombres de los distritos (ubigeo 010601–010612) deben verificarse con el I
 2. **Formulario** en dos bloques, con listas desplegables, validaciones con mensajes claros y botones "Calcular riesgo" y "Limpiar".
 3. **Resultado:** 🔴 Riesgo alto · 🟡 Riesgo medio · 🟢 Riesgo bajo, "Puntaje de riesgo" (no es la probabilidad real),
    factores que aumentan o disminuyen el riesgo en frases, gráfico opcional en "Ver detalle", nota fija y botones "Volver" y "Nueva evaluación".
-4. Menú lateral: **Historial y reporte** (descarga CSV y resumen), **Métricas del modelo** y **Cuestionario SUS** (puntaje = 2,5·[Σ(impares−1)+Σ(5−pares)]).
+4. Menú lateral: **Historial y reporte** (descarga CSV y resumen), **Métricas del modelo** y **Cuestionario SUS**.
+   El SUS sigue la plantilla de la tesis (anónimo: N.º de cuestionario, fecha, casos registrados de 5, profesión, años de experiencia,
+   uso de computadora, 10 afirmaciones, comentarios; puntaje = 2,5·[Σ(impares−1)+Σ(5−pares)]) y exige responder todas las afirmaciones.
+
+## Registros ("base de datos" en CSV)
+
+La app guarda lo que se registra en dos archivos separados (UTF-8 con BOM, se abren bien en Excel):
+
+| Archivo | Contenido |
+|---|---|
+| `data/registros/predicciones.csv` | una fila por evaluación: fecha y hora, los 10 datos, puntaje, nivel de riesgo, factores y modelo |
+| `data/registros/sus_respuestas.csv` | una fila por cuestionario SUS: datos del participante, p1–p10, puntaje, interpretación y comentarios |
+
+Se crean solos al primer registro y no se suben a GitHub (`.gitignore`). Si un CSV está abierto en Excel, la app avisa y no pierde el resultado en pantalla.
+Para analizar el SUS: `python ml/sus_analisis.py` (requiere al menos 3 cuestionarios).
 
 Los niveles salen de umbrales fijados en validación cruzada: medio = Recall 0,70 (con la mayor precisión posible); alto = Recall ≈ 0,40.
 
@@ -90,7 +105,7 @@ Con Ipress (solo análisis de sensibilidad en validación cruzada) el AUC sube a
 * Con el umbral de Recall 0,70 se marca como riesgo medio o alto a la mayoría de las gestantes y la precisión es baja (prevalencia 5,7 %).
 * El puntaje no es una probabilidad calibrada. SHAP muestra asociaciones del modelo, no causas.
 * La prueba tiene 51 casos de BPN: los intervalos son amplios y los subgrupos son solo descriptivos.
-* El historial y el SUS se guardan en `data/app.db` (SQLite local).
+* Los registros de la app se guardan en CSV locales (`data/registros/`); si se quiere compartir, debe cuidarse la privacidad.
 
 ## Autores y licencia
 
