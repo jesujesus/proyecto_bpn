@@ -1,4 +1,6 @@
 """Aplicación Streamlit: inicio, formulario, resultado, historial/reporte, métricas del modelo y cuestionario SUS."""
+import hmac
+import os
 import sys
 from pathlib import Path
 
@@ -38,6 +40,66 @@ st.markdown("""<style>
 .nota{background:#f6f8fa;border-left:4px solid #8c959f;padding:10px 14px;border-radius:6px;color:#24292f;margin-top:14px}
 .hero{text-align:center;padding:30px 0 10px 0}.hero h1{font-size:2.4rem}.hero p{font-size:1.15rem;color:#57606a}
 </style>""", unsafe_allow_html=True)
+
+
+# ----------------------------------------------------------------------------- acceso (códigos)
+def secreto(nombre):
+    v = os.environ.get(nombre.upper())
+    if not v:
+        try:
+            v = st.secrets.get(nombre)
+        except Exception:
+            v = None
+    return str(v).strip() if v else None
+
+
+COD_ACCESO, COD_ADMIN, AVISO = secreto("codigo_acceso"), secreto("codigo_admin"), secreto("aviso")
+
+
+def _igual(a, b):
+    return hmac.compare_digest((a or "").encode("utf-8"), (b or "").encode("utf-8"))
+
+
+if "rol" not in st.session_state:       # None = sin sesión; sin códigos configurados (uso local) todos son administradores
+    st.session_state["rol"] = None if COD_ACCESO else ("participante" if COD_ADMIN else "admin")
+
+if st.session_state["rol"] is None:
+    st.markdown('<div class="hero"><h1>🤰 Riesgo de bajo peso al nacer</h1><p>Ingrese el código de acceso para continuar.</p></div>',
+                unsafe_allow_html=True)
+    with st.form("form_acceso"):
+        codigo = st.text_input("Código de acceso", type="password")
+        entrar = st.form_submit_button("Entrar", type="primary")
+    if entrar:
+        if COD_ADMIN and _igual(codigo, COD_ADMIN):
+            st.session_state["rol"] = "admin"
+            st.rerun()
+        elif _igual(codigo, COD_ACCESO):
+            st.session_state["rol"] = "participante"
+            st.rerun()
+        else:
+            st.error("Código incorrecto.")
+    st.stop()
+
+
+def es_admin():
+    return st.session_state.get("rol") == "admin"
+
+
+def exigir_admin():
+    """True si el usuario es administrador; si no, pide el código de administrador."""
+    if es_admin():
+        return True
+    st.info("Esta sección es solo para el administrador.")
+    with st.form("form_admin"):
+        codigo = st.text_input("Código de administrador", type="password")
+        ok = st.form_submit_button("Desbloquear")
+    if ok:
+        if _igual(codigo, COD_ADMIN):
+            st.session_state["rol"] = "admin"
+            st.rerun()
+        else:
+            st.error("Código incorrecto.")
+    return False
 
 
 # ----------------------------------------------------------------------------- modelo / API
@@ -95,6 +157,11 @@ with st.sidebar:
     st.caption("Herramienta de apoyo. No reemplaza el criterio clínico.")
     st.caption(f"Modelo: {pl.b['modelo']}")
     st.caption("Conectado a la API" if usar_api else "Usando el modelo local")
+    if COD_ACCESO or COD_ADMIN:
+        st.caption(f"Sesión: {'administrador' if es_admin() else 'participante'}")
+        if st.button("Cerrar sesión"):
+            st.session_state["rol"] = None if COD_ACCESO else "participante"
+            st.rerun()
 
 
 # ----------------------------------------------------------------------------- 1. inicio
@@ -104,12 +171,16 @@ def pantalla_inicio():
                 unsafe_allow_html=True)
     st.write("")
     st.button("Nueva evaluación", type="primary", width="stretch", on_click=ir, args=("formulario", True))
-    st.caption("Provincia de Rodríguez de Mendoza, Amazonas. No requiere usuario ni contraseña.")
+    st.caption("Provincia de Rodríguez de Mendoza, Amazonas.")
+    if AVISO:
+        st.info(AVISO)
 
 
 # ----------------------------------------------------------------------------- 2. formulario
 def pantalla_formulario():
     st.subheader("Nueva evaluación")
+    if AVISO:
+        st.info(AVISO)
     st.markdown("##### Datos de la madre")
     c1, c2 = st.columns(2)
     c1.number_input("Edad (años)", 0, 99, key="f_edad")
@@ -186,7 +257,7 @@ def pantalla_resultado():
         st.info("No fue posible generar la explicación para este caso.")
 
     if not r.get("guardado", True):
-        st.warning("El resultado no se pudo guardar en el historial (¿el archivo predicciones.csv está abierto en Excel?). Ciérrelo y vuelva a calcular.")
+        st.warning("El resultado no se pudo guardar en el historial. " + reg.ERROR_GUARDADO)
     st.markdown('<div class="nota">Resultado orientativo. Siga el protocolo de atención prenatal del establecimiento.</div>', unsafe_allow_html=True)
     st.write("")
     b1, b2 = st.columns(2)
@@ -197,6 +268,8 @@ def pantalla_resultado():
 # ----------------------------------------------------------------------------- historial y reporte
 def seccion_historial():
     st.subheader("Historial y reporte")
+    if not exigir_admin():
+        return
     h = reg.leer_predicciones()
     if h.empty:
         st.info("Aún no hay evaluaciones guardadas.")
@@ -211,7 +284,7 @@ def seccion_historial():
     k[0].metric("Evaluaciones", len(h))
     for col, n in zip(k[1:], ["Alto", "Medio", "Bajo"]):
         col.metric(f"Riesgo {n.lower()}", int((tabla["Riesgo"] == n).sum()))
-    st.caption(f"Puntaje promedio: {h['puntaje_riesgo'].mean():.0f} % · Archivo: data/registros/predicciones.csv")
+    st.caption(f"Puntaje promedio: {h['puntaje_riesgo'].mean():.0f} % · Guardado en: {reg.donde()}")
     st.dataframe(tabla, hide_index=True, width="stretch")
     resumen = (f"# Reporte de evaluaciones\n\n- Total de evaluaciones: {len(h)}\n"
                + "".join(f"- Riesgo {n.lower()}: {int((tabla['Riesgo'] == n).sum())}\n" for n in ["Alto", "Medio", "Bajo"])
@@ -303,26 +376,28 @@ def seccion_sus():
         else:
             r = reg.guardar_sus(fecha, casos, profesion, otra, experiencia, usa_pc, resp, comentarios)
             if r is None:
-                st.error("No se pudo guardar el cuestionario (¿el archivo sus_respuestas.csv está abierto en Excel?). Ciérrelo e inténtelo de nuevo.")
+                st.error("No se pudo guardar el cuestionario. " + reg.ERROR_GUARDADO)
             else:
                 st.session_state["sus_ok"] = f"¡Gracias! Su cuestionario quedó registrado (N.º {r[0]})."
                 st.session_state["sus_form"] = ver + 1
                 st.rerun()
 
-    r = reg.leer_sus()
-    if not r.empty:
-        st.divider()
-        st.markdown("##### Resultados registrados")
-        alfa = reg.alfa_cronbach(r)
-        k = st.columns(4)
-        k[0].metric("Cuestionarios", len(r))
-        k[1].metric("SUS promedio", f"{r['puntaje_sus'].mean():.1f}", help="Una media mayor a 68 se considera aceptable")
-        k[2].metric("Con SUS ≥ 68", int((r["puntaje_sus"] >= 68).sum()))
-        k[3].metric("Alfa de Cronbach", "—" if alfa is None else f"{alfa:.2f}".replace(".", ","), help="Se calcula desde 3 cuestionarios")
-        st.caption("Archivo: data/registros/sus_respuestas.csv")
-        st.dataframe(r[["cuestionario_n", "fecha", "profesion", "experiencia", "usa_computadora", "casos_registrados", "puntaje_sus", "interpretacion"]]
-                     .iloc[::-1], hide_index=True, width="stretch")
-        st.download_button("⬇️ Descargar SUS (CSV completo)", r.to_csv(index=False).encode("utf-8-sig"), "sus_respuestas.csv", "text/csv")
+    with st.expander("Resultados registrados (administrador)", expanded=not COD_ADMIN):
+        if exigir_admin():
+            r = reg.leer_sus()
+            if r.empty:
+                st.info("Aún no hay cuestionarios registrados.")
+                return
+            alfa = reg.alfa_cronbach(r)
+            k = st.columns(4)
+            k[0].metric("Cuestionarios", len(r))
+            k[1].metric("SUS promedio", f"{r['puntaje_sus'].mean():.1f}", help="Una media mayor a 68 se considera aceptable")
+            k[2].metric("Con SUS ≥ 68", int((r["puntaje_sus"] >= 68).sum()))
+            k[3].metric("Alfa de Cronbach", "—" if alfa is None else f"{alfa:.2f}".replace(".", ","), help="Se calcula desde 3 cuestionarios")
+            st.caption(f"Guardado en: {reg.donde()}")
+            st.dataframe(r[["cuestionario_n", "fecha", "profesion", "experiencia", "usa_computadora", "casos_registrados", "puntaje_sus", "interpretacion"]]
+                         .iloc[::-1], hide_index=True, width="stretch")
+            st.download_button("⬇️ Descargar SUS (CSV completo)", r.to_csv(index=False).encode("utf-8-sig"), "sus_respuestas.csv", "text/csv")
 
 
 # ----------------------------------------------------------------------------- enrutador

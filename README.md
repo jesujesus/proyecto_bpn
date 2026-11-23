@@ -72,7 +72,12 @@ Los nombres de los distritos (ubigeo 010601–010612) deben verificarse con el I
    El SUS sigue la plantilla de la tesis (anónimo: N.º de cuestionario, fecha, casos registrados de 5, profesión, años de experiencia,
    uso de computadora, 10 afirmaciones, comentarios; puntaje = 2,5·[Σ(impares−1)+Σ(5−pares)]) y exige responder todas las afirmaciones.
 
-## Registros ("base de datos" en CSV)
+## Registros (base de datos o CSV)
+
+Con `database_url` configurada (secreto de Streamlit o variable `DATABASE_URL`) los datos se guardan en PostgreSQL (Supabase), tablas `predicciones` y `sus_respuestas`.
+Sin ella, se guardan en CSV locales. Para publicar la app temporalmente con códigos de acceso y de administrador, ver [DESPLIEGUE.md](DESPLIEGUE.md).
+
+Modo CSV:
 
 La app guarda lo que se registra en dos archivos separados (UTF-8 con BOM, se abren bien en Excel):
 
@@ -82,6 +87,8 @@ La app guarda lo que se registra en dos archivos separados (UTF-8 con BOM, se ab
 | `data/registros/sus_respuestas.csv` | una fila por cuestionario SUS: datos del participante, p1–p10, puntaje, interpretación y comentarios |
 
 Se crean solos al primer registro y no se suben a GitHub (`.gitignore`). Si un CSV está abierto en Excel, la app avisa y no pierde el resultado en pantalla.
+
+Códigos (opcionales): `codigo_acceso` para participantes y `codigo_admin` para ver el historial y los resultados del SUS (ver `.streamlit/secrets.toml.example`).
 Para analizar el SUS: `python ml/sus_analisis.py` (requiere al menos 3 cuestionarios).
 
 Los niveles salen de umbrales fijados en validación cruzada: medio = Recall 0,70 (con la mayor precisión posible); alto = Recall ≈ 0,40.
