@@ -47,7 +47,7 @@ def secreto(nombre):
     v = os.environ.get(nombre.upper())
     if not v:
         try:
-            v = st.secrets.get(nombre)
+            v = st.secrets.get(nombre) or st.secrets.get(nombre.upper())
         except Exception:
             v = None
     return str(v).strip() if v else None
@@ -157,6 +157,14 @@ with st.sidebar:
     st.caption("Herramienta de apoyo. No reemplaza el criterio clínico.")
     st.caption(f"Modelo: {pl.b['modelo']}")
     st.caption("Conectado a la API" if usar_api else "Usando el modelo local")
+    if "bd_estado" not in st.session_state:
+        st.session_state["bd_estado"] = reg.inicializar()      # crea las tablas la primera vez y avisa si no hay conexión
+    if st.session_state["bd_estado"] == "ok":
+        st.caption("Datos: base de datos conectada ✅")
+    elif st.session_state["bd_estado"] == "csv":
+        st.caption("Datos: archivos CSV locales")
+    else:
+        st.warning(f"Sin conexión a la base de datos: {st.session_state['bd_estado']}. Los registros no se guardarán.")
     if COD_ACCESO or COD_ADMIN:
         st.caption(f"Sesión: {'administrador' if es_admin() else 'participante'}")
         if st.button("Cerrar sesión"):

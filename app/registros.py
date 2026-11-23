@@ -57,14 +57,27 @@ def _py(v):
 
 # ------------------------------------------------------------------ destino
 def _url():
+    """URL de la base de datos: variable de entorno DATABASE_URL o secreto `DATABASE_URL`/`database_url` de Streamlit."""
     u = os.environ.get("DATABASE_URL")
     if not u:
         try:
             import streamlit as st
-            u = st.secrets.get("database_url")
+            u = st.secrets.get("DATABASE_URL") or st.secrets.get("database_url")
         except Exception:
             u = None
     return str(u).strip() if u else None
+
+
+def inicializar():
+    """Comprueba la conexión y crea las tablas si faltan. Devuelve 'csv', 'ok' o un texto de error (sin datos sensibles)."""
+    u = _url()
+    if not u:
+        return "csv"
+    try:
+        _con(_BD(u)).close()
+        return "ok"
+    except Exception as e:
+        return f"error ({type(e).__name__})"
 
 
 def donde():
