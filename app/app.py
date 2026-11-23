@@ -2,6 +2,7 @@
 import hmac
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -60,8 +61,50 @@ def _igual(a, b):
     return hmac.compare_digest((a or "").encode("utf-8"), (b or "").encode("utf-8"))
 
 
+# Persistencia al recargar: st.session_state se pierde al recargar la página, así que la sesión se guarda en la URL
+# como un token firmado (rol + vencimiento + HMAC con los códigos). Cambiar los códigos invalida todas las sesiones.
+DURACION_SESION = 30 * 60
+
+
+def _firma(rol, vence):
+    clave = f"{COD_ACCESO}|{COD_ADMIN}".encode("utf-8")
+    return hmac.new(clave, f"{rol}|{vence}".encode("utf-8"), "sha256").hexdigest()[:32]
+
+
+def _emitir_token(rol):
+    vence = int(time.time()) + DURACION_SESION
+    return f"{rol}.{vence}.{_firma(rol, vence)}"
+
+
+def _rol_de_token(token):
+    try:
+        rol, vence, firma = str(token).split(".")
+        if rol in ("participante", "admin") and int(vence) > time.time() and _igual(firma, _firma(rol, vence)):
+            return rol
+    except Exception:
+        pass
+    return None
+
+
+def guardar_sesion(rol):
+    """Fija el rol en la sesión y en la URL (None = cerrar sesión)."""
+    st.session_state["rol"] = rol
+    try:
+        if rol:
+            st.query_params["s"] = _emitir_token(rol)
+        elif "s" in st.query_params:
+            del st.query_params["s"]
+    except Exception:
+        pass
+
+
 if "rol" not in st.session_state:       # None = sin sesión; sin códigos configurados (uso local) todos son administradores
     st.session_state["rol"] = None if COD_ACCESO else ("participante" if COD_ADMIN else "admin")
+    if COD_ACCESO or COD_ADMIN:         # recarga de página: recuperar la sesión desde el token de la URL
+        try:
+            st.session_state["rol"] = _rol_de_token(st.query_params.get("s")) or st.session_state["rol"]
+        except Exception:
+            pass
 
 if st.session_state["rol"] is None:
     st.markdown('<div class="hero"><h1>🤰 Riesgo de bajo peso al nacer</h1><p>Ingrese el código de acceso para continuar.</p></div>',
@@ -71,10 +114,10 @@ if st.session_state["rol"] is None:
         entrar = st.form_submit_button("Entrar", type="primary")
     if entrar:
         if COD_ADMIN and _igual(codigo, COD_ADMIN):
-            st.session_state["rol"] = "admin"
+            guardar_sesion("admin")
             st.rerun()
         elif _igual(codigo, COD_ACCESO):
-            st.session_state["rol"] = "participante"
+            guardar_sesion("participante")
             st.rerun()
         else:
             st.error("Código incorrecto.")
@@ -95,7 +138,7 @@ def exigir_admin():
         ok = st.form_submit_button("Desbloquear")
     if ok:
         if _igual(codigo, COD_ADMIN):
-            st.session_state["rol"] = "admin"
+            guardar_sesion("admin")
             st.rerun()
         else:
             st.error("Código incorrecto.")
@@ -168,7 +211,7 @@ with st.sidebar:
     if COD_ACCESO or COD_ADMIN:
         st.caption(f"Sesión: {'administrador' if es_admin() else 'participante'}")
         if st.button("Cerrar sesión"):
-            st.session_state["rol"] = None if COD_ACCESO else "participante"
+            guardar_sesion(None if COD_ACCESO else "participante")
             st.rerun()
 
 
